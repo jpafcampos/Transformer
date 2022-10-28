@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn 
 from Layers import EncoderLayer, DecoderLayer
-from Embed import Embedder, PositionalEncoder
+from Embed import TokenEmbedding, PositionalEncoding
 from Sublayers import Norm
 import copy
 
@@ -12,8 +12,8 @@ class Encoder(nn.Module):
     def __init__(self, vocab_size, d_model, N, heads, dropout):
         super().__init__()
         self.N = N
-        self.embed = Embedder(vocab_size, d_model)
-        self.pe = PositionalEncoder(d_model, dropout=dropout)
+        self.embed = TokenEmbedding(vocab_size, d_model)
+        self.pe = PositionalEncoding(d_model, dropout=dropout)
         self.layers = get_clones(EncoderLayer(d_model, heads, dropout), N)
         self.norm = Norm(d_model)
     def forward(self, src, mask):
@@ -27,8 +27,8 @@ class Decoder(nn.Module):
     def __init__(self, vocab_size, d_model, N, heads, dropout):
         super().__init__()
         self.N = N
-        self.embed = Embedder(vocab_size, d_model)
-        self.pe = PositionalEncoder(d_model, dropout=dropout)
+        self.embed = TokenEmbedding(vocab_size, d_model)
+        self.pe = PositionalEncoding(d_model, dropout=dropout)
         self.layers = get_clones(DecoderLayer(d_model, heads, dropout), N)
         self.norm = Norm(d_model)
     def forward(self, trg, e_outputs, src_mask, trg_mask):
@@ -39,14 +39,14 @@ class Decoder(nn.Module):
         return self.norm(x)
 
 class Transformer(nn.Module):
-    def __init__(self, src_vocab, trg_vocab, d_model, N, heads, dropout):
+    def __init__(self, src_vocab, trg_vocab, d_model, num_enc_layers, num_dec_layers, heads, dropout):
         super().__init__()
-        self.encoder = Encoder(src_vocab, d_model, N, heads, dropout)
-        self.decoder = Decoder(trg_vocab, d_model, N, heads, dropout)
+        self.encoder = Encoder(src_vocab, d_model, num_enc_layers, heads, dropout)
+        self.decoder = Decoder(trg_vocab, d_model, num_dec_layers, heads, dropout)
         self.out = nn.Linear(d_model, trg_vocab)
     def forward(self, src, trg, src_mask, trg_mask):
         e_outputs = self.encoder(src, src_mask)
-        #print("DECODER")
+        print("DECODER")
         d_output = self.decoder(trg, e_outputs, src_mask, trg_mask)
         output = self.out(d_output)
         return output
@@ -56,7 +56,7 @@ def get_model(opt, src_vocab, trg_vocab):
     assert opt.d_model % opt.heads == 0
     assert opt.dropout < 1
 
-    model = Transformer(src_vocab, trg_vocab, opt.d_model, opt.n_layers, opt.heads, opt.dropout)
+    model = Transformer(src_vocab, trg_vocab, opt.d_model, opt.num_enc_layers, opt.num_dec_layers, opt.heads, opt.dropout)
        
     if opt.load_weights is not None:
         print("loading pretrained weights...")
